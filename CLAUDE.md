@@ -14,5 +14,9 @@ Exploring a C++ codebase provided by Lonny.
 - When analyzing code, designing features, or discussing system structure, apply Event Modeling concepts: Slices, Events, Commands, Views, Actors, GWT, and the grid layout
 - The goal is to think in terms of Paths, immutable Events as the coupling point, pure Command Handlers, and data-shaping View Handlers
 
+## Time
+- All time values are UTC — store and pass `DateTimeOffset` values in UTC always
+- Timezone conversion is a View concern — convert to local time only in a ViewSlice when the display requires it
+
 ## Notes
 - Update this file as the project evolves
