@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(jq '.hooks.PostToolUse[0].hooks[0].command = \"\"echo \\\\\"\"$\\(date\\) hook fired\\\\\"\" >> /tmp/claude-hook-check.txt; \"\" + .hooks.PostToolUse[0].hooks[0].command' /home/ivan/PROJECTS/LONNEY-TEST/.claude/settings.json)",
+      "Bash(cp /home/ivan/PROJECTS/LONNEY-TEST/.claude/settings.json /tmp/settings-backup.json)",
+      "Bash(cp /tmp/settings-test.json /home/ivan/PROJECTS/LONNEY-TEST/.claude/settings.json)"
+    ]
+  }
+}

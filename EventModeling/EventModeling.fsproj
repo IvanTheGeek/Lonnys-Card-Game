@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>EventModeling</RootNamespace>
+    <AssemblyName>EventModeling</AssemblyName>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Core.fs" />
+    <Compile Include="Handlers.fs" />
+    <Compile Include="GWT.fs" />
+    <Compile Include="Slice.fs" />
+    <Compile Include="Path.fs" />
+    <Compile Include="Grouping.fs" />
+  </ItemGroup>
+</Project>

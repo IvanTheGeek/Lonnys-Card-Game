@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="EventModeling.Testing/EventModeling.Testing.fsproj" />
+  <Project Path="EventModeling.Tests/EventModeling.Tests.fsproj" />
+  <Project Path="EventModeling/EventModeling.fsproj" />
+</Solution>
