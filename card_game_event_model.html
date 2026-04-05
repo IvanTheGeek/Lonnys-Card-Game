@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Event Model — Lonny's Card Game</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #F1F5F9;
+      color: #1E293B;
+      padding: 24px;
+    }
+
+    h1 { font-size: 1.2rem; margin-bottom: 4px; }
+
+    .subtitle {
+      font-size: 0.72rem;
+      color: #64748B;
+      margin-bottom: 16px;
+    }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.68rem;
+      color: #374151;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    /* Scroll wrapper */
+    .scroll-wrap {
+      overflow-x: auto;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    /* Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: 100px repeat(23, 145px);
+      grid-template-rows:
+        auto   /* row 1: slice headers */
+        34px   /* row 2: system actor */
+        34px   /* row 3: player 1 actor */
+        34px   /* row 4: player 2 actor */
+        5px    /* row 5: divider */
+        95px   /* row 6: command or view */
+        5px    /* row 7: divider */
+        80px;  /* row 8: event */
+      min-width: max-content;
+    }
+
+    /* Row labels */
+    .lbl {
+      background: #F8FAFC;
+      border-right: 2px solid #CBD5E1;
+      border-bottom: 1px solid #E2E8F0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 8px;
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: #64748B;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Divider row label */
+    .lbl.div-lbl {
+      background: #E2E8F0;
+      border-right: 2px solid #CBD5E1;
+    }
+
+    /* Slice header */
+    .sh {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 6px 4px;
+      border-right: 1px solid #D1D5DB;
+      border-bottom: 2px solid #CBD5E1;
+      position: relative;
+    }
+
+    .sh.cs { background: #DBEAFE; }
+    .sh.vs { background: #DCFCE7; }
+
+    .sh .num  { font-size: 0.55rem; color: #94A3B8; font-weight: 600; }
+    .sh .typ  { font-size: 0.58rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+    .sh.cs .typ { color: #1D4ED8; }
+    .sh.vs .typ { color: #047857; }
+    .sh .nm   { font-size: 0.55rem; color: #475569; text-align: center; line-height: 1.2; }
+    .sh .arr  { font-size: 0.8rem; font-weight: 700; }
+    .sh.cs .arr { color: #1D4ED8; }
+    .sh.vs .arr { color: #047857; }
+
+    .bug-icon {
+      position: absolute;
+      top: 3px;
+      right: 4px;
+      font-size: 0.65rem;
+      cursor: help;
+    }
+
+    .badge {
+      font-size: 0.52rem;
+      border-radius: 3px;
+      padding: 1px 4px;
+      font-weight: 600;
+    }
+
+    .badge.repeat { background: #E0E7FF; color: #4338CA; }
+    .badge.cond   { background: #FEF9C3; color: #854D0E; }
+
+    /* Actor cells */
+    .ac {
+      border-right: 1px solid #E2E8F0;
+      border-bottom: 1px solid #E2E8F0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.58rem;
+      font-weight: 700;
+    }
+
+    .ac.off  { background: #F8FAFC; color: #E2E8F0; }
+    .ac.sys  { background: #475569; color: #fff; }
+    .ac.p1   { background: #7C3AED; color: #fff; }
+    .ac.p2   { background: #DB2777; color: #fff; }
+    .ac.both { background: linear-gradient(90deg, #7C3AED 50%, #DB2777 50%); color: #fff; }
+
+    /* Divider cells */
+    .div-cell { background: #E2E8F0; border-right: 1px solid #CBD5E1; }
+
+    /* Command / View card cell */
+    .cv-cell {
+      border-right: 1px solid #E2E8F0;
+      border-bottom: 1px solid #E2E8F0;
+      padding: 6px 5px;
+      display: flex;
+      align-items: stretch;
+    }
+
+    /* Event card cell */
+    .ev-cell {
+      border-right: 1px solid #E2E8F0;
+      padding: 6px 5px;
+      display: flex;
+      align-items: stretch;
+    }
+
+    /* Cards */
+    .card {
+      border-radius: 5px;
+      padding: 5px;
+      font-size: 0.58rem;
+      font-weight: 500;
+      color: #fff;
+      text-align: center;
+      line-height: 1.35;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+    }
+
+    .card.cmd     { background: #3B82F6; }
+    .card.view    { background: #10B981; }
+    .card.event   { background: #F97316; }
+    .card.missing { background: #EF4444; border: 2px dashed #7F1D1D; }
+
+    /* Bugs footer */
+    .bugs {
+      margin-top: 24px;
+    }
+
+    .bugs h2 {
+      font-size: 0.85rem;
+      margin-bottom: 10px;
+      color: #7F1D1D;
+    }
+
+    .bug-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .bug-entry {
+      display: flex;
+      gap: 10px;
+      font-size: 0.72rem;
+      background: #FEF2F2;
+      border: 1px solid #FECACA;
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+
+    .bug-entry .slice-ref {
+      font-weight: 700;
+      color: #991B1B;
+      white-space: nowrap;
+    }
+
+    .bug-entry .bug-desc {
+      color: #374151;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Event Model — Lonny's Card Game</h1>
+<p class="subtitle">
+  PATH: One Complete Game Round &nbsp;·&nbsp;
+  CommandSlice <strong>↓</strong> flows Actor → Command → Event &nbsp;·&nbsp;
+  ViewSlice <strong>↑</strong> flows Event → View → Actor
+</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="swatch" style="background:#3B82F6"></div> Command</div>
+  <div class="legend-item"><div class="swatch" style="background:#10B981"></div> View</div>
+  <div class="legend-item"><div class="swatch" style="background:#F97316"></div> Event</div>
+  <div class="legend-item"><div class="swatch" style="background:#EF4444;border:2px dashed #7F1D1D"></div> Missing Event</div>
+  <div class="legend-item"><div class="swatch" style="background:#475569"></div> System</div>
+  <div class="legend-item"><div class="swatch" style="background:#7C3AED"></div> Player 1</div>
+  <div class="legend-item"><div class="swatch" style="background:#DB2777"></div> Player 2</div>
+  <div class="legend-item"><span class="badge repeat">↺ repeat</span> Repeating slice</div>
+  <div class="legend-item"><span class="badge cond">? cond</span> Conditional slice</div>
+  <div class="legend-item">⚠️ Bug (hover for detail)</div>
+</div>
+
+<div class="scroll-wrap">
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="bugs" id="bugs">
+  <h2>⚠️ Bugs & Gaps Surfaced by the Model</h2>
+  <div class="bug-list" id="bug-list"></div>
+</div>
+
+<script>
+const slices = [
+  {
+    num: 1, type: 'cs', name: 'ShuffleDeck',
+    actor: 'sys',
+    cmd: 'ShuffleDeck',
+    event: 'DeckShuffled'
+  },
+  {
+    num: 2, type: 'cs', name: 'DealToPlayer1',
+    actor: 'sys',
+    cmd: 'DealCards\n(Player 1)',
+    event: 'CardsDealt\n(Player 1)',
+    bug: 'Slice 2 — First card drawn without checking used[] — potential duplicate card dealt to Player 1'
+  },
+  {
+    num: 3, type: 'vs', name: 'P1 Views Hand',
+    actor: 'p1',
+    view: 'Player 1\nHand',
+    event: 'CardsDealt\n(Player 1)'
+  },
+  {
+    num: 4, type: 'cs', name: 'DealToPlayer2',
+    actor: 'sys',
+    cmd: 'DealCards\n(Player 2)',
+    event: 'CardsDealt\n(Player 2)'
+  },
+  {
+    num: 5, type: 'vs', name: 'P2 Views Hand',
+    actor: 'p2',
+    view: 'Player 2\nHand',
+    event: 'CardsDealt\n(Player 2)',
+    bug: "Slice 5 — P2's hand displayed before P1 decides to redraw. P1 can see P2's cards. Game fairness flaw."
+  },
+  {
+    num: 6, type: 'cs', name: 'P1 Decides',
+    actor: 'p1',
+    cmd: 'KeepHand |\nRequestRedraw\n(Player 1)',
+    event: 'HandKept |\nRedrawRequested\n(Player 1)'
+  },
+  {
+    num: 7, type: 'vs', name: 'P1 Redraw Select',
+    actor: 'p1',
+    view: 'Player 1\nHand\n(Numbered)',
+    event: 'RedrawRequested\n(Player 1)',
+    cond: true
+  },
+  {
+    num: 8, type: 'cs', name: 'P1 ReplaceCard',
+    actor: 'p1',
+    cmd: 'ReplaceCard\n(P1, position)',
+    event: 'CardReplaced\n(Player 1)',
+    repeat: true
+  },
+  {
+    num: 9, type: 'vs', name: 'P1 Updated Hand',
+    actor: 'p1',
+    view: 'Player 1\nUpdated Hand',
+    event: 'CardReplaced\n(Player 1)',
+    repeat: true
+  },
+  {
+    num: 10, type: 'cs', name: 'P1 FinishRedraw',
+    actor: 'p1',
+    cmd: 'FinishRedraw\n(Player 1)',
+    event: 'HandFinalized\n(Player 1)'
+  },
+  {
+    num: 11, type: 'vs', name: 'P2 Hand Reminder',
+    actor: 'p2',
+    view: 'Player 2\nHand\n(Reminder)',
+    event: 'CardsDealt\n(Player 2)',
+    bug: 'Slice 11 — Redundant view. P2 hand already shown in Slice 5. Exposes unresolved sequencing in the code (displayplayer call).'
+  },
+  {
+    num: 12, type: 'cs', name: 'P2 Decides',
+    actor: 'p2',
+    cmd: 'KeepHand |\nRequestRedraw\n(Player 2)',
+    event: 'HandKept |\nRedrawRequested\n(Player 2)'
+  },
+  {
+    num: 13, type: 'vs', name: 'P2 Redraw Select',
+    actor: 'p2',
+    view: 'Player 2\nHand\n(Numbered)',
+    event: 'RedrawRequested\n(Player 2)',
+    cond: true
+  },
+  {
+    num: 14, type: 'cs', name: 'P2 ReplaceCard',
+    actor: 'p2',
+    cmd: 'ReplaceCard\n(P2, position)',
+    event: 'CardReplaced\n(Player 2)',
+    repeat: true
+  },
+  {
+    num: 15, type: 'vs', name: 'P2 Updated Hand',
+    actor: 'p2',
+    view: 'Player 2\nUpdated Hand',
+    event: 'CardReplaced\n(Player 2)',
+    repeat: true
+  },
+  {
+    num: 16, type: 'cs', name: 'P2 FinishRedraw',
+    actor: 'p2',
+    cmd: 'FinishRedraw\n(Player 2)',
+    event: 'HandFinalized\n(Player 2)'
+  },
+  {
+    num: 17, type: 'cs', name: 'Evaluate P1 Hand',
+    actor: 'sys',
+    cmd: 'EvaluateHand\n(Player 1)',
+    event: 'HandEvaluated\n(Player 1)',
+    bug: 'Slice 17 — Three-of-a-kind detection logic is incorrect (adjacent pair check). Two pairs not distinguished from one pair in point system.'
+  },
+  {
+    num: 18, type: 'vs', name: 'P1 Hand Result',
+    actor: 'p1',
+    view: 'Player 1\nResult',
+    event: 'HandEvaluated\n(Player 1)'
+  },
+  {
+    num: 19, type: 'cs', name: 'Evaluate P2 Hand',
+    actor: 'sys',
+    cmd: 'EvaluateHand\n(Player 2)',
+    event: 'HandEvaluated\n(Player 2)'
+  },
+  {
+    num: 20, type: 'vs', name: 'P2 Hand Result',
+    actor: 'p2',
+    view: 'Player 2\nResult',
+    event: 'HandEvaluated\n(Player 2)'
+  },
+  {
+    num: 21, type: 'cs', name: 'DeclareWinner',
+    actor: 'sys',
+    cmd: 'DeclareWinner',
+    event: 'WinnerDeclared',
+    bug: 'Slice 21 — No tie handling. Equal scores silently default to Player 2 wins. TieDeclared is a missing event.'
+  },
+  {
+    num: 22, type: 'vs', name: 'Winner Screen',
+    actor: 'both',
+    view: 'Winner\nAnnouncement',
+    event: 'WinnerDeclared'
+  },
+  {
+    num: 23, type: 'cs', name: 'Play Again?',
+    actor: 'p1',
+    cmd: 'PlayAgain |\nQuitGame',
+    event: 'GameRestarted |\nGameEnded\n(MISSING)',
+    missing: true,
+    bug: "Slice 23 — while(again = 'y') uses assignment not comparison. QuitGame is unreachable. GameEnded never fires. Infinite loop."
+  }
+];
+
+function nl(s) { return s.replace(/\n/g, '<br>'); }
+
+let html = '';
+const bugEntries = [];
+
+// ── ROW 1: Slice headers ──────────────────────────────────────
+html += `<div class="lbl"></div>`;
+slices.forEach(s => {
+  const arrow = s.type === 'cs' ? '↓' : '↑';
+  const typeLabel = s.type === 'cs' ? 'CommandSlice' : 'ViewSlice';
+  const bugHtml  = s.bug    ? `<span class="bug-icon" title="${s.bug}">⚠️</span>` : '';
+  const repHtml  = s.repeat ? `<span class="badge repeat">↺ repeat</span>` : '';
+  const condHtml = s.cond   ? `<span class="badge cond">? cond</span>` : '';
+  html += `
+    <div class="sh ${s.type}">
+      ${bugHtml}
+      <span class="num">#${s.num}</span>
+      <span class="typ">${typeLabel}</span>
+      <span class="nm">${s.name}</span>
+      <span class="arr">${arrow}</span>
+      ${repHtml}${condHtml}
+    </div>`;
+  if (s.bug) bugEntries.push({ ref: `#${s.num} ${s.name}`, desc: s.bug });
+});
+
+// ── ROW 2: System actor ───────────────────────────────────────
+html += `<div class="lbl">System</div>`;
+slices.forEach(s => {
+  const on = s.actor === 'sys';
+  html += `<div class="ac ${on ? 'sys' : 'off'}">${on ? '● System' : ''}</div>`;
+});
+
+// ── ROW 3: Player 1 actor ─────────────────────────────────────
+html += `<div class="lbl">Player 1</div>`;
+slices.forEach(s => {
+  const on = s.actor === 'p1' || s.actor === 'both';
+  const cls = s.actor === 'both' ? 'both' : on ? 'p1' : 'off';
+  html += `<div class="ac ${cls}">${on ? '● Player 1' : ''}</div>`;
+});
+
+// ── ROW 4: Player 2 actor ─────────────────────────────────────
+html += `<div class="lbl">Player 2</div>`;
+slices.forEach(s => {
+  const on = s.actor === 'p2' || s.actor === 'both';
+  const cls = s.actor === 'both' ? 'both' : on ? 'p2' : 'off';
+  html += `<div class="ac ${cls}">${on ? '● Player 2' : ''}</div>`;
+});
+
+// ── ROW 5: Divider ────────────────────────────────────────────
+html += `<div class="lbl div-lbl"></div>`;
+slices.forEach(() => { html += `<div class="div-cell"></div>`; });
+
+// ── ROW 6: Command or View card ───────────────────────────────
+html += `<div class="lbl">Cmd / View</div>`;
+slices.forEach(s => {
+  const cls   = s.type === 'cs' ? 'cmd' : 'view';
+  const label = s.type === 'cs' ? s.cmd : s.view;
+  html += `<div class="cv-cell"><div class="card ${cls}">${nl(label)}</div></div>`;
+});
+
+// ── ROW 7: Divider ────────────────────────────────────────────
+html += `<div class="lbl div-lbl"></div>`;
+slices.forEach(() => { html += `<div class="div-cell"></div>`; });
+
+// ── ROW 8: Event card ─────────────────────────────────────────
+html += `<div class="lbl">Event</div>`;
+slices.forEach(s => {
+  const missingCls = s.missing ? 'missing' : '';
+  html += `<div class="ev-cell"><div class="card event ${missingCls}">${nl(s.event)}</div></div>`;
+});
+
+document.getElementById('grid').innerHTML = html;
+
+// Bugs footer
+const bugList = document.getElementById('bug-list');
+bugEntries.forEach(b => {
+  const div = document.createElement('div');
+  div.className = 'bug-entry';
+  div.innerHTML = `<span class="slice-ref">⚠️ ${b.ref}</span><span class="bug-desc">${b.desc}</span>`;
+  bugList.appendChild(div);
+});
+</script>
+
+</body>
+</html>
